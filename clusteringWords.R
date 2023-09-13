@@ -8,12 +8,12 @@ library(ggplot2)
 library(reshape2)
 
 #Variables
-nameData="Animals_15.csv" #name of the file with the data
+nameData="Animals_15.csv" #name of the file with the data #name of the file with the data
 #The structure of the file must have 2 columns, the first column with the ID of the person, 
 #the second column must have the words. 
 #The order of the words in the file is assumed to be the order of the data.
 
-simThreshold=0.1 #Similarity threshold for the clustering process
+simThreshold=0.10 #Similarity threshold for the clustering process
 #Recall, the similarity threshold defines the minimum similarity between 
 #two elements to be considered in the clustering process.
 #A high value will add most of the element to the rare cluster, generating a single cluster
@@ -224,3 +224,69 @@ ggplot(tempDF)+aes(x=Var1,y=Var2,fill=value)+geom_raster(alpha=0.95)+
   theme(panel.grid.minor = element_blank())+
   theme(panel.grid.major = element_line(color="black"))+
   coord_cartesian(xlim=c(0.5,numCols+0.5),ylim=c(0.5,numCols+0.5))
+
+
+
+#################COUNTING SHIFTS AND CLUSTERS
+finalVector=numeric(2)
+finalVector[1]=numCluster-1
+index=1
+sum=0
+for (i in clusterList){
+  if (index>1){
+    sum=sum+length(i)
+  }
+  index=index+1
+}
+finalVector[2]=sum
+
+
+#Adding a new column to facilitate the process of shifting
+newDataShift=data
+newDataShift["cluster"]=0
+for (i in unique(data$indexes)){
+  #iterating over each property (index number)
+  for (j in c(1:length(clusterList))){
+    #selecting the cluster where the index number is assigned
+    if (sum(clusterList[[j]]==i)>0){
+      selectedCluster=j
+    }
+  }
+  #Assigning the number of cluster to all the elements of the dataset
+  newDataShift$cluster[newDataShift$indexes==i]=selectedCluster
+}
+
+#Variable with all the number of shifts
+numberShifts=numeric(length(unique(newDataShift[,1])))
+numberClusters=numeric(length(unique(newDataShift[,1])))
+numberProp=numeric(length(unique(newDataShift[,1])))
+varCluster=numeric(length(unique(newDataShift[,1])))
+indexChild=1
+for (i in unique(newDataShift[,1])){
+  #Obtaining the data of each subject
+  tempData=newDataShift[newDataShift[,1]==i,]
+  if (nrow(tempData)==1){
+    numberShifts[indexChild]=0
+  } else {
+    numberShifts[indexChild]=sum(tempData$cluster[c(1:(length(tempData$cluster)-1))]-tempData$cluster[c(2:length(tempData$cluster))]!=0)
+  }
+  numberClusters[indexChild]=length(unique(tempData$cluster))
+  numberProp[indexChild]=nrow(tempData)
+  if (numberClusters[indexChild] == 1){
+    varCluster[indexChild]=0
+  } else {
+    varCluster[indexChild]=round(sd(table(tempData$cluster)),2)
+  }
+  indexChild=indexChild+1
+}
+
+#Creating a dataframe with the information per user
+tempDF=data.frame(matrix(data=0,nrow = length(unique(newDataShift[,1])),ncol = 4))
+tempDF[,1]=unique(newDataShift[,1])
+tempDF[,2]=numberClusters
+tempDF[,3]=numberShifts
+tempDF[,4]=numberProp
+tempDF[,5]=varCluster
+colnames(tempDF) = c("Sujeto","Clusters","Shifts","#Prop","sd")
+tempDF
+
